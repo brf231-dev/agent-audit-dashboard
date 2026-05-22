@@ -474,6 +474,25 @@ function drawSummary(rep,activeDate){
     backgroundColor:s.c,
   }));
 
+  // Add Transition/Gap as the final dataset
+  const gapData=dates.map(d=>{
+    const ivs=rd[d]||[];
+    const sorted=[...ivs].sort((a,b)=>a.s-b.s);
+    let gapMins=0;
+    for(let i=0;i<sorted.length-1;i++){
+      const g=sorted[i+1].s-sorted[i].e;
+      if(g>0.0003) gapMins+=g*60;
+    }
+    return Math.round(gapMins*10)/10;
+  });
+  if(gapData.some(g=>g>0)){
+    datasets.push({
+      label:'Transition / Gap',
+      data:gapData,
+      backgroundColor:'rgba(149,165,166,0.5)',
+    });
+  }
+
   if(sumChart) sumChart.destroy();
   sumChart=new Chart(document.getElementById('sc2'),{
     type:'bar',
