@@ -453,15 +453,24 @@ function drawGantt(rep,date){
 
 // ── Summary chart ─────────────────────────────────────────────────────────
 function drawSummary(rep,activeDate){
-  const rd=DAILY[rep]||{};
+  // Build summary from DATA intervals (same source as Gantt and stats panel)
+  const rd=DATA[rep]||{};
   const dates=Object.keys(rd).sort();
   if(!dates.length) return;
   document.getElementById('sumMeta').textContent=rep+' · '+dates.length+' days';
 
-  const presentStates=STATES.filter(s=>dates.some(d=>rd[d][s.n]>0));
+  // Roll up minutes per state per day from intervals
+  const dayTotals={};
+  dates.forEach(d=>{
+    const totals={};
+    (rd[d]||[]).forEach(iv=>{ totals[iv.a]=(totals[iv.a]||0)+iv.d*60; });
+    dayTotals[d]=totals;
+  });
+
+  const presentStates=STATES.filter(s=>dates.some(d=>(dayTotals[d][s.n]||0)>0));
   const datasets=presentStates.map(s=>({
     label:s.n,
-    data:dates.map(d=>Math.round((rd[d][s.n]||0)*10)/10),
+    data:dates.map(d=>Math.round((dayTotals[d][s.n]||0)*10)/10),
     backgroundColor:s.c,
   }));
 
