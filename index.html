@@ -415,8 +415,20 @@ function drawGantt(rep,date){
     `<div class="li"><div class="ld" style="background:${COLOR[s]}"></div>${s}</div>`
   ).join('');
 
-  // Stats
-  const dd=(DAILY[rep]||{})[date]||{};
+  // Stats — use DAILY if available, otherwise calculate from DATA intervals
+  const ddRaw=(DAILY[rep]||{})[date];
+  let dd;
+  if(ddRaw){
+    dd=ddRaw;
+  } else {
+    // Build stats from DATA intervals directly
+    dd={};
+    sorted.forEach(iv=>{
+      const mins=iv.d*60;
+      dd[iv.a]=(dd[iv.a]||0)+mins;
+    });
+    dd['_s']=sessDur*60;
+  }
   const sessMin=dd['_s']||dd['_session']||(sessDur*60);
 
   // Sum all known-state minutes so we can show the remainder
