@@ -269,29 +269,7 @@ function drawGantt(rep,date){
 
   function tx(h){return LABEL+PL+((h-sessStart)/sessDur)*BAR_W;}
 
-  // Grid lines + time axis
-  const step=sessDur<=4?0.25:sessDur<=8?0.5:1;
-  const ts=Math.ceil(sessStart/step)*step;
-  ctx.textAlign='center'; ctx.font='11px -apple-system,sans-serif';
-  for(let t=ts;t<=sessEnd+.001;t+=step){
-    t=Math.round(t*10000)/10000;
-    const x=tx(t);
-    if(x<LABEL+PL||x>W-PR) continue;
-    ctx.fillStyle='#e8ecf0';
-    ctx.fillRect(x,PT-4,1,H-PT+4);
-    ctx.fillStyle='#999';
-    ctx.fillText(hToAmPm(t),x,PT-8);
-  }
-
-  // Session start/end markers
-  ctx.strokeStyle='#aaa'; ctx.setLineDash([3,3]); ctx.lineWidth=1;
-  [sessStart,sessEnd].forEach(t=>{
-    const x=tx(t);
-    ctx.beginPath(); ctx.moveTo(x,PT-2); ctx.lineTo(x,H-PB); ctx.stroke();
-  });
-  ctx.setLineDash([]);
-
-  // Build gap intervals
+  // Build gap intervals (need these first to know final canvas height)
   const gapIntervals=[];
   for(let i=0;i<sorted.length-1;i++){
     const e=sorted[i].e, s=sorted[i+1].s;
