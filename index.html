@@ -269,6 +269,10 @@ function drawGantt(rep,date){
 
   function tx(h){return LABEL+PL+((h-sessStart)/sessDur)*BAR_W;}
 
+  // Grid step (needed for redraw after H2 is known)
+  const step=sessDur<=4?0.25:sessDur<=8?0.5:1;
+  const ts=Math.ceil(sessStart/step)*step;
+
   // Build gap intervals (need these first to know final canvas height)
   const gapIntervals=[];
   for(let i=0;i<sorted.length-1;i++){
