@@ -399,13 +399,37 @@ function drawGantt(rep,date){
   const knownSum=rowStates.reduce((acc,s)=>acc+(dd[s]||0),0);
   const gap=Math.max(0,sessMin-knownSum);
   const gapPct=sessMin>0?Math.round(gap/sessMin*100):0;
+
+  // Calculate how much of WRK 1 time is gap
+  const wrk1Mins=dd['WRK 1']||0;
+  // Gap time that falls within WRK 1 intervals
+  const wrk1Intervals=sorted.filter(iv=>iv[0]==='WRK 1');
+  let gapInWrk1=0;
+  if(wrk1Intervals.length>0 && gapIntervals){
+    gapIntervals.forEach(g=>{
+      wrk1Intervals.forEach(w=>{
+        const overlapStart=Math.max(g.s,w[1]);
+        const overlapEnd=Math.min(g.e,w[2]);
+        if(overlapEnd>overlapStart) gapInWrk1+=(overlapEnd-overlapStart)*60;
+      });
+    });
+  }
+  const gapInWrk1PctOfWrk1=wrk1Mins>0?Math.round(gapInWrk1/wrk1Mins*100):0;
+  const gapInWrk1PctOfShift=sessMin>0?Math.round(gapInWrk1/sessMin*100):0;
+
   document.getElementById('stats').innerHTML=
     rowStates.map(s=>{
       const m=dd[s]||0, pct=sessMin>0?Math.round(m/sessMin*100):0;
+      const isWrk1=s==='WRK 1';
+      const wrk1Note=(isWrk1 && gapInWrk1>=1)?
+        `<div style="font-size:10px;color:#95A5A6;margin-top:3px;font-style:italic">
+          of which ~${fmtMins(Math.round(gapInWrk1))} is Transition/Gap — ${gapInWrk1PctOfWrk1}% of WRK 1, ${gapInWrk1PctOfShift}% of shift
+        </div>`:'';
       return `<div class="sc">
         <div class="sl" style="color:${COLOR[s]}">${s}</div>
         <div class="sv" style="color:${COLOR[s]}">${fmtMins(m)}</div>
         <div class="ss">${pct}% of shift</div>
+        ${wrk1Note}
       </div>`;
     }).join('')+
     (gap>=1?`<div class="sc">
