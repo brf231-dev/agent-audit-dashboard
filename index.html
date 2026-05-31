@@ -252,11 +252,12 @@ function drawGantt(rep,date){
     return;
   }
   const sorted=[...ivs].sort((a,b)=>a.s-b.s);
-  const sessStart=sorted[0].s, sessEnd=sorted[sorted.length-1].e;
+  const sessStart=Array.isArray(sorted[0])?sorted[0][1]:sorted[0].s;
+  const sessEnd=Array.isArray(sorted[sorted.length-1])?sorted[sorted.length-1][2]:sorted[sorted.length-1].e;
   const sessDur=sessEnd-sessStart;
 
   // States present this day, in canonical order
-  const present=new Set(sorted.map(iv=>iv.a));
+  const present=new Set(sorted.map(iv=>Array.isArray(iv)?iv[0]:iv.a));
   const rowStates=STATES.filter(s=>present.has(s.n)).map(s=>s.n);
 
   const canvas=document.getElementById('gc');
@@ -393,8 +394,13 @@ function drawGantt(rep,date){
 
   // Stats — always calculate from DATA intervals (ground truth)
   const ddDaily=(DAILY[rep]||{})[date]||{};
+  // Support both object {a,s,e,d} and array [a,s,e,d] interval formats
+  const ivA=iv=>Array.isArray(iv)?iv[0]:iv.a;
+  const ivS=iv=>Array.isArray(iv)?iv[1]:iv.s;
+  const ivE=iv=>Array.isArray(iv)?iv[2]:iv.e;
+  const ivD=iv=>Array.isArray(iv)?iv[3]:iv.d;
   const dd={};
-  sorted.forEach(iv=>{ dd[iv.a]=(dd[iv.a]||0)+iv.d*60; });
+  sorted.forEach(iv=>{ dd[ivA(iv)]=(dd[ivA(iv)]||0)+ivD(iv)*60; });
   const sessMin=ddDaily['_s']||ddDaily['_session']||(sessDur*60);
   const knownSum=rowStates.reduce((acc,s)=>acc+(dd[s]||0),0);
   const gap=Math.max(0,sessMin-knownSum);
@@ -403,13 +409,13 @@ function drawGantt(rep,date){
   // Calculate how much of WRK 1 time is gap
   const wrk1Mins=dd['WRK 1']||0;
   // Gap time that falls within WRK 1 intervals
-  const wrk1Intervals=sorted.filter(iv=>iv[0]==='WRK 1');
+  const wrk1Intervals=sorted.filter(iv=>ivA(iv)==='WRK 1');
   let gapInWrk1=0;
   if(wrk1Intervals.length>0 && gapIntervals){
     gapIntervals.forEach(g=>{
       wrk1Intervals.forEach(w=>{
-        const overlapStart=Math.max(g.s,w[1]);
-        const overlapEnd=Math.min(g.e,w[2]);
+        const overlapStart=Math.max(g.s,ivS(w));
+        const overlapEnd=Math.min(g.e,ivE(w));
         if(overlapEnd>overlapStart) gapInWrk1+=(overlapEnd-overlapStart)*60;
       });
     });
