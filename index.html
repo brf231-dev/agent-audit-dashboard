@@ -276,10 +276,61 @@ function drawGantt(rep,date){
 
   // Build gap intervals (need these first to know final canvas height)
   const gapIntervals=[];
+
+  // Method 1: gaps between consecutive intervals (no state at all)
   for(let i=0;i<sorted.length-1;i++){
     const e=sorted[i].e, s=sorted[i+1].s;
     if(s>e+0.0003) gapIntervals.push({s:e,e:s,d:s-e,after:sorted[i].a,before:sorted[i+1].a});
   }
+
+  // Method 2: gaps INSIDE WRK 1 blocks where no other state overlaps
+  const wrk1Raw=sorted.filter(iv=>iv.a==='WRK 1');
+  wrk1Raw.forEach(w=>{
+    // Build a timeline of covered time within this WRK 1 block
+    // Find all non-WRK1 intervals that overlap this block
+    const covered=[];
+    sorted.forEach(iv=>{
+      if(iv.a==='WRK 1') return;
+      const os=Math.max(iv.s,w.s);
+      const oe=Math.min(iv.e,w.e);
+      if(oe>os+0.0003) covered.push({s:os,e:oe});
+    });
+    // Sort and merge covered intervals
+    covered.sort((a,b)=>a.s-b.s);
+    const merged=[];
+    covered.forEach(c=>{
+      if(merged.length===0||c.s>merged[merged.length-1].e+0.0003){
+        merged.push({s:c.s,e:c.e});
+      } else {
+        merged[merged.length-1].e=Math.max(merged[merged.length-1].e,c.e);
+      }
+    });
+    // Gaps are the uncovered portions of this WRK 1 block
+    let cursor=w.s;
+    merged.forEach(m=>{
+      if(m.s>cursor+0.0003){
+        gapIntervals.push({s:cursor,e:m.s,d:m.s-cursor,after:'WRK 1',before:'WRK 1',inWrk1:true});
+      }
+      cursor=Math.max(cursor,m.e);
+    });
+    if(w.e>cursor+0.0003){
+      gapIntervals.push({s:cursor,e:w.e,d:w.e-cursor,after:'WRK 1',before:'WRK 1',inWrk1:true});
+    }
+  });
+
+  // Deduplicate — remove any Method 1 gaps that are fully inside a WRK 1 block
+  // (they're now covered by Method 2)
+  const wrk1Set=wrk1Raw;
+  for(let i=gapIntervals.length-1;i>=0;i--){
+    const g=gapIntervals[i];
+    if(g.inWrk1) continue; // keep all Method 2 gaps
+    // Check if this gap falls entirely inside a WRK 1 block
+    const insideWrk1=wrk1Set.some(w=>g.s>=w.s-0.0003&&g.e<=w.e+0.0003);
+    if(insideWrk1) gapIntervals.splice(i,1);
+  }
+
+  // Sort all gap intervals by start time
+  gapIntervals.sort((a,b)=>a.s-b.s);
   const allRows=[...rowStates,...(gapIntervals.length>0?['Transition / Gap']:[])];
   const H2=PT+allRows.length*(ROW_H+GAP)+PB;
   canvas.height=H2;
@@ -406,31 +457,50 @@ function drawGantt(rep,date){
   const gap=Math.max(0,sessMin-knownSum);
   const gapPct=sessMin>0?Math.round(gap/sessMin*100):0;
 
-  // Calculate how much of WRK 1 time is gap
+  // Full WRK 1 breakdown — what fills each WRK 1 block
   const wrk1Mins=dd['WRK 1']||0;
-  // Gap time that falls within WRK 1 intervals
   const wrk1Intervals=sorted.filter(iv=>ivA(iv)==='WRK 1');
-  let gapInWrk1=0;
-  if(wrk1Intervals.length>0 && gapIntervals){
-    gapIntervals.forEach(g=>{
+  const wrk1Overlaps={};  // state -> minutes overlapping with WRK 1
+  let wrk1TotalOverlap=0;
+  if(wrk1Intervals.length>0){
+    sorted.forEach(iv=>{
+      const state=ivA(iv);
+      if(state==='WRK 1') return;
       wrk1Intervals.forEach(w=>{
-        const overlapStart=Math.max(g.s,ivS(w));
-        const overlapEnd=Math.min(g.e,ivE(w));
-        if(overlapEnd>overlapStart) gapInWrk1+=(overlapEnd-overlapStart)*60;
+        const os=Math.max(ivS(iv),ivS(w));
+        const oe=Math.min(ivE(iv),ivE(w));
+        if(oe>os){
+          wrk1Overlaps[state]=(wrk1Overlaps[state]||0)+(oe-os)*60;
+          wrk1TotalOverlap+=(oe-os)*60;
+        }
       });
     });
   }
-  const gapInWrk1PctOfWrk1=wrk1Mins>0?Math.round(gapInWrk1/wrk1Mins*100):0;
-  const gapInWrk1PctOfShift=sessMin>0?Math.round(gapInWrk1/sessMin*100):0;
+  const wrk1TrueGap=Math.max(0,wrk1Mins-wrk1TotalOverlap);
+  const wrk1TrueGapPctOfWrk1=wrk1Mins>0?Math.round(wrk1TrueGap/wrk1Mins*100):0;
+  const wrk1TrueGapPctOfShift=sessMin>0?Math.round(wrk1TrueGap/sessMin*100):0;
+  // Keep legacy vars for compatibility
+  const gapInWrk1=wrk1TrueGap;
+  const gapInWrk1PctOfWrk1=wrk1TrueGapPctOfWrk1;
+  const gapInWrk1PctOfShift=wrk1TrueGapPctOfShift;
 
   document.getElementById('stats').innerHTML=
     rowStates.map(s=>{
       const m=dd[s]||0, pct=sessMin>0?Math.round(m/sessMin*100):0;
       const isWrk1=s==='WRK 1';
-      const wrk1Note=(isWrk1 && gapInWrk1>=1)?
-        `<div style="font-size:10px;color:#95A5A6;margin-top:3px;font-style:italic">
-          of which ~${fmtMins(Math.round(gapInWrk1))} is Transition/Gap — ${gapInWrk1PctOfWrk1}% of WRK 1, ${gapInWrk1PctOfShift}% of shift
-        </div>`:'';
+      let wrk1Note='';
+      if(isWrk1 && wrk1Mins>=1){
+        const breakdownLines=Object.entries(wrk1Overlaps)
+          .filter(([s,m])=>m>=0.5)
+          .sort((a,b)=>b[1]-a[1])
+          .map(([s,m])=>`${s}: ${fmtMins(Math.round(m))} (${wrk1Mins>0?Math.round(m/wrk1Mins*100):0}%)`)
+          .join(', ');
+        const gapLine=wrk1TrueGap>=1?`True gap: ${fmtMins(Math.round(wrk1TrueGap))} — ${wrk1TrueGapPctOfWrk1}% of WRK 1, ${wrk1TrueGapPctOfShift}% of shift`:'';
+        wrk1Note=`<div style="font-size:10px;color:#95A5A6;margin-top:4px;line-height:1.6">
+          ${breakdownLines?`<span style="font-style:italic">Inside WRK 1: ${breakdownLines}</span><br>`:''}
+          ${gapLine?`<span style="font-style:italic;color:#e74c3c">${gapLine}</span>`:''}
+        </div>`;
+      };
       return `<div class="sc">
         <div class="sl" style="color:${COLOR[s]}">${s}</div>
         <div class="sv" style="color:${COLOR[s]}">${fmtMins(m)}</div>
