@@ -268,6 +268,7 @@ function drawGantt(rep,date){
   const ctx=canvas.getContext('2d');
   const step=sessDur<=4?0.25:sessDur<=8?0.5:1;
   const ts=Math.ceil(sessStart/step)*step;
+  const tx=t=>(LABEL+PL)+(t-sessStart)/sessDur*BAR_W;
 
   // Gap intervals: between states + inside WRK 1
   const gapIntervals=[];
