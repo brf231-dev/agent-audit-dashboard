@@ -456,10 +456,11 @@ function drawGantt(rep,date){
         ${wrk1Note}
       </div>`;
     }).join('')+
-    (gap>=1?`<div class="sc">
+    (gap>=1?`<div class="sc" style="border:1px solid #e0e4ea">
       <div class="sl" style="color:#95A5A6;font-style:italic">Transition / Gap</div>
       <div class="sv" style="color:#95A5A6">${fmtMins(gap)}</div>
       <div class="ss">${gapPct}% of shift</div>
+      <div style="font-size:10px;color:#bbb;margin-top:2px;font-style:italic">unaccounted time</div>
     </div>`:'')+
     `<div class="sc" style="border-top:1px solid #e0e4ea;margin-top:4px;padding-top:4px">
       <div class="sl" style="font-weight:600">Total shift</div>
